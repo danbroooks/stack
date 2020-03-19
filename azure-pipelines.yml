@@ -14,7 +14,7 @@ variables:
   S3_BUCKET: "fpco-public-cache"
   AWS_REGION: "us-east-1"
 
-jobs:
+jobs: []
 # - template: ./.azure/azure-osx-template.yml
 #   parameters:
 #     name: macOS
