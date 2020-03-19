@@ -1,7 +1,12 @@
-export ARTIFACT_STAGING_DIR=$1
+export OS_NAME=$1
+export ARTIFACT_STAGING_DIR=$2
+
+echo $OS_NAME
 echo $ARTIFACT_STAGING_DIR
 
-# echo $OS_NAME
+pwd
+ls
+
 # export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
 # echo $STACK_ROOT
 # mkdir -p ~/.local/bin
