@@ -1,3 +1,5 @@
+set -x
+
 export OS_NAME=$1
 export ARTIFACT_STAGING_DIR=$2
 
