@@ -1,10 +1,10 @@
 set -x
 
-OS_NAME=$1
-ARTIFACT_STAGING_DIR=$2
+os_name=$1
+dir=$2
 
-echo $OS_NAME
-echo $ARTIFACT_STAGING_DIR
+echo $os_name
+echo $dir
 
 pwd
 ls
