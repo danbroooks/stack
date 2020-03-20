@@ -24,6 +24,9 @@ for i in $list; do cp  -v "$i" "${dir}${i}"; done
 list="$(ldd /bin/tar | egrep -o '/lib.*\.[0-9]')"
 for i in $list; do cp  -v "$i" "${dir}${i}"; done
 
+echo $PATH
+export PATH=$PATH:/bin
+
 # Build inside insolated environment
 cat << EOF | chroot $dir
 ori_stack_root=$STACK_ROOT
