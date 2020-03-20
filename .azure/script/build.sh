@@ -9,38 +9,20 @@ cache_s3_prefix=$4
 base_branch=$5
 source_branch=$6
 
+clean_resource() {
+    rm -rf $HOME/.local/bin
+    rm -rf $HOME/.stack-root
+    rm -rf /opt/ghc
+    rm -rf /opt/happy
+    rm -rf /opt/alex
+}
 
-# Setup isolated environment
-mkdir -p $dir/{bin,lib64,lib}
-mkdir -p ${dir}${HOME}
-
-cp -v /bin/{bash,ls,tar,mkdir,curl} $dir/bin
-
-list="$(ldd /bin/ls | egrep -o '/lib.*\.so(\.[0-9]+)?')"
-for i in $list; do cp  -v "$i" "${dir}${i}"; done
-
-list="$(ldd /bin/bash | egrep -o '/lib.*\.so(\.[0-9]+)?')"
-for i in $list; do cp  -v "$i" "${dir}${i}"; done
-
-list="$(ldd /bin/tar | egrep -o '/lib.*\.so(\.[0-9]+)?')"
-for i in $list; do cp  -v "$i" "${dir}${i}"; done
-
-list="$(ldd /bin/mkdir | egrep -o '/lib.*\.so(\.[0-9]+)?')"
-for i in $list; do cp  -v "$i" "${dir}${i}"; done
-
-list="$(ldd /bin/curl | egrep -o '/lib.*\.so(\.[0-9]+)?')"
-for i in $list; do cp  -v "$i" "${dir}${i}"; done
-
-echo $PATH
-export PATH=$PATH:/bin
-echo $PATH
-
-# Build inside insolated environment
-cat << EOF | sudo chroot $dir
 ori_stack_root=$STACK_ROOT
 ori_path=$PATH
 
-cd /stack
+clean_resource
+
+cd $dir
 export STACK_ROOT=$HOME/.stack-root;
 echo $STACK_ROOT
 mkdir -p $HOME/.local/bin
@@ -64,4 +46,5 @@ cache-s3 --prefix="${cache_s3_prefix}" --git-branch="${source_branch}" --suffix=
 # Reset env var
 export STACK_ROOT=$ori_stack_root
 export PATH=$ori_path
-EOF
+
+clean_resource
