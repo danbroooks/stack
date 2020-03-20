@@ -26,9 +26,10 @@ for i in $list; do cp  -v "$i" "${dir}${i}"; done
 
 echo $PATH
 export PATH=$PATH:/bin
+echo $PATH
 
 # Build inside insolated environment
-cat << EOF | chroot $dir
+cat << EOF | sudo chroot $dir
 ori_stack_root=$STACK_ROOT
 ori_path=$PATH
 
