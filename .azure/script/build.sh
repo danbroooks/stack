@@ -1,16 +1,15 @@
 set -x
 
-pwd
 ls
 
-# echo $1
-# echo $2
+echo $1
+echo $2
 
-# os_name=$1
-# dir=$2
+os_name=$1
+dir=$2
 
-# echo $os_name
-# echo $dir
+echo $os_name
+echo $dir
 
 
 # export STACK_ROOT="$(Build.SourcesDirectory)"/.stack-root;
