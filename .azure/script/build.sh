@@ -30,6 +30,7 @@ echo $PATH
 
 # Build inside insolated environment
 cat << EOF | sudo chroot $dir
+set -m
 ori_stack_root=$STACK_ROOT
 ori_path=$PATH
 
