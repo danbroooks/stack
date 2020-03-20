@@ -1,5 +1,6 @@
 #!/bin/bash
 # set -x
+set -m
 
 os_name=$1
 dir=$2
@@ -30,7 +31,6 @@ echo $PATH
 
 # Build inside insolated environment
 cat << EOF | sudo chroot $dir
-set -m
 ori_stack_root=$STACK_ROOT
 ori_path=$PATH
 
