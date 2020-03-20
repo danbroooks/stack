@@ -13,7 +13,7 @@ source_branch=$6
 mkdir -p $dir/{bin,lib64,lib}
 mkdir -p ${dir}${HOME}
 
-cp -v /bin/{bash,ls, tar} $dir/bin
+cp -v /bin/{bash,ls,tar} $dir/bin
 
 list="$(ldd /bin/ls | egrep -o '/lib.*\.[0-9]')"
 for i in $list; do cp  -v "$i" "${dir}${i}"; done
