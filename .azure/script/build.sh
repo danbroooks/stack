@@ -16,19 +16,19 @@ mkdir -p ${dir}${HOME}
 
 cp -v /bin/{bash,ls,tar,mkdir,curl} $dir/bin
 
-list="$(ldd /bin/ls | egrep -o '/lib.*\.[0-9]+')"
+list="$(ldd /bin/ls | egrep -o '/lib.*\.so(\.[0-9]+)?')"
 for i in $list; do cp  -v "$i" "${dir}${i}"; done
 
-list="$(ldd /bin/bash | egrep -o '/lib.*\.[0-9]+')"
+list="$(ldd /bin/bash | egrep -o '/lib.*\.so(\.[0-9]+)?')"
 for i in $list; do cp  -v "$i" "${dir}${i}"; done
 
-list="$(ldd /bin/tar | egrep -o '/lib.*\.[0-9]+')"
+list="$(ldd /bin/tar | egrep -o '/lib.*\.so(\.[0-9]+)?')"
 for i in $list; do cp  -v "$i" "${dir}${i}"; done
 
-list="$(ldd /bin/mkdir | egrep -o '/lib.*\.[0-9]+')"
+list="$(ldd /bin/mkdir | egrep -o '/lib.*\.so(\.[0-9]+)?')"
 for i in $list; do cp  -v "$i" "${dir}${i}"; done
 
-list="$(ldd /bin/curl | egrep -o '/lib.*\.[0-9]+')"
+list="$(ldd /bin/curl | egrep -o '/lib.*\.so(\.[0-9]+)?')"
 for i in $list; do cp  -v "$i" "${dir}${i}"; done
 
 echo $PATH
