@@ -1,9 +1,4 @@
-set -x
-
-ls
-
-echo $1
-echo $2
+# set -x
 
 os_name=$1
 dir=$2
