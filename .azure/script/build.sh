@@ -26,6 +26,8 @@ cd $dir
 export STACK_ROOT=$HOME/.stack-root;
 echo $STACK_ROOT
 mkdir -p $HOME/.local/bin
+echo "URL:"
+echo "https://github.com/fpco/cache-s3/releases/download/${cache_s3_version}/cache-s3-${cache_s3_version}-linux-x86_64.tar.gz"
 curl -f -L "https://github.com/fpco/cache-s3/releases/download/${cache_s3_version}/cache-s3-${cache_s3_version}-linux-x86_64.tar.gz" -o $HOME/.local/bin/cache-s3.tar.gz
 tar xzf $HOME/.local/bin/cache-s3.tar.gz -C $HOME/.local/bin
 export PATH=$HOME/.local/bin:$PATH;
