@@ -1539,7 +1539,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                  (logInfo
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
-            let buildTargets = makeSingleBuildTargets (makePackageTargets executableBuildStatuses)
+            let packageTargets = makePackageTargets executableBuildStatuses
+                buildTargets = makeSingleBuildTargets packageTargets
 
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix buildTargets))) cabal cabalfp task
             let installedMapHasThisPkg :: Bool
@@ -1566,7 +1567,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                           (TTLocalMutable lp, False, True) -> finalComponentOptions lp
                           (TTLocalMutable lp, True, False) -> primaryComponentOptions (makeLocalPackageTargets executableBuildStatuses lp) lp ++ finalComponentOptions lp
                           (TTRemotePackage{}, _, _) -> []
-                    Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses buildOptions
+                    Just <$> realBuild cache package pkgDir cabal0 announce packageTargets buildOptions
 
     initialBuildSteps buildTargets cabal announce = do
         _ <- announce ("initial-build-steps" <> RIO.display (annSuffix buildTargets))
@@ -1578,10 +1579,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         -> Path Abs Dir
         -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
         -> (Utf8Builder -> RIO env ())
-        -> Map Text ExecutableBuildStatus
+        -> PackageTargets
         -> [String]
         -> RIO env Installed
-    realBuild cache package pkgDir cabal0 announce executableBuildStatuses buildOptions = do
+    realBuild cache package pkgDir cabal0 announce packageTargets buildOptions = do
         let cabal = cabal0 CloseOnException
         wc <- view $ actualCompilerVersionL.whichCompilerL
 
@@ -1620,7 +1621,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
-        let sbt = makeSingleBuildTargets (makePackageTargets executableBuildStatuses)
+        let sbt = makeSingleBuildTargets packageTargets
         () <- announce ("build" <> RIO.display (annSuffix sbt))
         config <- view configL
         extraOpts <- extraBuildOptions wc eeBuildOpts
