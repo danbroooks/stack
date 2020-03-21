@@ -1401,7 +1401,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     enableTests = buildingFinals && any isCTest (taskComponents task)
     enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
 
-    makeSingleBuildTargets executableBuildStatuses = SingleBuildTargets
+    makeSingleBuildTargets pt = SingleBuildTargets
       { singleBuildTargetLib = taskAllInOne && hasLib
       , singleBuildTargetInternalLib = taskAllInOne && hasSubLib
       , singleBuildTargetExe = taskAllInOne && hasExe
@@ -1420,17 +1420,17 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         hasExe =
           not $ Set.null (packageTargetsExecutables pt)
 
-        pt =
-          case taskType of
-            TTLocalMutable lp ->
-              makeLocalPackageTargets executableBuildStatuses lp
-            -- This isn't true, but we don't want to have this info for
-            -- upstream deps.
-            _ -> PackageTargets
-              { packageTargetsLibraries = NoLibraries
-              , packageTargetsSubLibraries = mempty
-              , packageTargetsExecutables = mempty
-              }
+    makePackageTargets executableBuildStatuses =
+      case taskType of
+        TTLocalMutable lp ->
+          makeLocalPackageTargets executableBuildStatuses lp
+        -- This isn't true, but we don't want to have this info for
+        -- upstream deps.
+        _ -> PackageTargets
+          { packageTargetsLibraries = NoLibraries
+          , packageTargetsSubLibraries = mempty
+          , packageTargetsExecutables = mempty
+          }
 
     annSuffix sbt =
       let result = showSingleBuildTargets sbt
@@ -1539,7 +1539,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                  (logInfo
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
-            let buildTargets = makeSingleBuildTargets executableBuildStatuses
+            let buildTargets = makeSingleBuildTargets (makePackageTargets executableBuildStatuses)
 
             _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix buildTargets))) cabal cabalfp task
             let installedMapHasThisPkg :: Bool
@@ -1613,7 +1613,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
-        let sbt = makeSingleBuildTargets executableBuildStatuses
+        let sbt = makeSingleBuildTargets (makePackageTargets executableBuildStatuses)
         () <- announce ("build" <> RIO.display (annSuffix sbt))
         config <- view configL
         extraOpts <- extraBuildOptions wc eeBuildOpts
