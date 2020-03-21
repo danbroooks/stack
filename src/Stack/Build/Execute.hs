@@ -1540,9 +1540,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
             let packageTargets = makePackageTargets executableBuildStatuses
-                buildTargets = makeSingleBuildTargets packageTargets
+                announceWithTargets label = announce (label <> RIO.display (annSuffix (makeSingleBuildTargets packageTargets)))
 
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix buildTargets))) cabal cabalfp task
+            _neededConfig <- ensureConfig cache pkgDir ee (announceWithTargets "configure") cabal cabalfp task
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
                     case Map.lookup (packageName package) installedMap of
@@ -1558,7 +1558,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 -- https://github.com/commercialhaskell/stack/issues/2787
                 (True, _) | null acDownstream -> return Nothing
                 (_, True) | null acDownstream || installedMapHasThisPkg -> do
-                    initialBuildSteps buildTargets cabal announce
+                    _ <- announceWithTargets "initial-build-steps"
+                    cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
                     return Nothing
                 _ -> fulfillCuratorBuildExpectations pname mcurator enableTests enableBenchmarks Nothing $ do
                     let buildOptions = case (taskType, taskAllInOne, isFinalBuild) of
@@ -1568,10 +1569,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                           (TTLocalMutable lp, True, False) -> primaryComponentOptions (makeLocalPackageTargets executableBuildStatuses lp) lp ++ finalComponentOptions lp
                           (TTRemotePackage{}, _, _) -> []
                     Just <$> realBuild cache package pkgDir cabal0 announce packageTargets buildOptions
-
-    initialBuildSteps buildTargets cabal announce = do
-        _ <- announce ("initial-build-steps" <> RIO.display (annSuffix buildTargets))
-        cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
     realBuild
         :: ConfigCache
@@ -1622,7 +1619,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
         let sbt = makeSingleBuildTargets packageTargets
-        () <- announce ("build" <> RIO.display (annSuffix sbt))
+        announce ("build" <> RIO.display (annSuffix sbt))
         config <- view configL
         extraOpts <- extraBuildOptions wc eeBuildOpts
         let stripTHLoading
