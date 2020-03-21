@@ -1401,17 +1401,14 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     enableTests = buildingFinals && any isCTest (taskComponents task)
     enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
 
-    annSuffix executableBuildStatuses = if result == "" then "" else " (" <> result <> ")"
+    makeSingleBuildTargets executableBuildStatuses = SingleBuildTargets
+      { singleBuildTargetLib = taskAllInOne && hasLib
+      , singleBuildTargetInternalLib = taskAllInOne && hasSubLib
+      , singleBuildTargetExe = taskAllInOne && hasExe
+      , singleBuildTargetTest = enableTests
+      , singleBuildTargetBench = enableBenchmarks
+      }
       where
-        result =
-          showSingleBuildTargets $ SingleBuildTargets
-            { singleBuildTargetLib = taskAllInOne && hasLib
-            , singleBuildTargetInternalLib = taskAllInOne && hasSubLib
-            , singleBuildTargetExe = taskAllInOne && hasExe
-            , singleBuildTargetTest = enableTests
-            , singleBuildTargetBench = enableBenchmarks
-            }
-
         (hasLib, hasSubLib, hasExe) = case taskType of
             TTLocalMutable lp ->
               let pt = makeLocalPackageTargets executableBuildStatuses lp
@@ -1425,6 +1422,10 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
             _ -> (False, False, False)
+
+    annSuffix sbt =
+      let result = showSingleBuildTargets sbt
+       in if result == "" then "" else " (" <> result <> ")"
 
     getPrecompiled cache =
         case taskType of
@@ -1529,8 +1530,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                  (logInfo
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
+            let sbt = makeSingleBuildTargets executableBuildStatuses
 
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix executableBuildStatuses))) cabal cabalfp task
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix sbt))) cabal cabalfp task
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
                     case Map.lookup (packageName package) installedMap of
@@ -1552,7 +1554,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                      Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses
 
     initialBuildSteps executableBuildStatuses cabal announce = do
-        announce ("initial-build-steps" <> RIO.display (annSuffix executableBuildStatuses))
+        let sbt = makeSingleBuildTargets executableBuildStatuses
+        announce ("initial-build-steps" <> RIO.display (annSuffix sbt))
         cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
     realBuild
@@ -1602,7 +1605,8 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                         line <> line <>
                         "Missing modules in the cabal file are likely to cause undefined reference errors from the linker, along with other problems."
 
-        () <- announce ("build" <> RIO.display (annSuffix executableBuildStatuses))
+        let sbt = makeSingleBuildTargets executableBuildStatuses
+        () <- announce ("build" <> RIO.display (annSuffix sbt))
         config <- view configL
         extraOpts <- extraBuildOptions wc eeBuildOpts
         let stripTHLoading
