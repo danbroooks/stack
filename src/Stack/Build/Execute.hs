@@ -1403,13 +1403,15 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
     annSuffix executableBuildStatuses = if result == "" then "" else " (" <> result <> ")"
       where
-        result = T.intercalate " + " $ concat
-            [ ["lib" | taskAllInOne && hasLib]
-            , ["internal-lib" | taskAllInOne && hasSubLib]
-            , ["exe" | taskAllInOne && hasExe]
-            , ["test" | enableTests]
-            , ["bench" | enableBenchmarks]
-            ]
+        result =
+          showSingleBuildTargets $ SingleBuildTargets
+            { singleBuildTargetLib = taskAllInOne && hasLib
+            , singleBuildTargetInternalLib = taskAllInOne && hasSubLib
+            , singleBuildTargetExe = taskAllInOne && hasExe
+            , singleBuildTargetTest = enableTests
+            , singleBuildTargetBench = enableBenchmarks
+            }
+
         (hasLib, hasSubLib, hasExe) = case taskType of
             TTLocalMutable lp ->
               let package = lpPackage lp
@@ -1758,6 +1760,24 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 liftIO $ atomically $ modifyTVar' tvar (Map.insert (dpGhcPkgId dp) dp)
                 return $ Just (dpGhcPkgId dp)
             _ -> error $ "singleBuild: invariant violated: multiple results when describing installed package " ++ show (name, dps)
+
+data SingleBuildTargets = SingleBuildTargets
+  { singleBuildTargetLib :: Bool
+  , singleBuildTargetInternalLib :: Bool
+  , singleBuildTargetExe :: Bool
+  , singleBuildTargetTest :: Bool
+  , singleBuildTargetBench :: Bool
+  }
+
+showSingleBuildTargets :: SingleBuildTargets -> Text
+showSingleBuildTargets SingleBuildTargets{..} =
+  T.intercalate " + " $ concat
+    [ ["lib" | singleBuildTargetLib ]
+    , ["internal-lib" | singleBuildTargetInternalLib ]
+    , ["exe" | singleBuildTargetExe ]
+    , ["test" | singleBuildTargetTest ]
+    , ["bench" | singleBuildTargetBench ]
+    ]
 
 -- | Get the build status of all the package executables. Do so by
 -- testing whether their expected output file exists, e.g.
