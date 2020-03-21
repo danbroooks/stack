@@ -1559,8 +1559,14 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 (_, True) | null acDownstream || installedMapHasThisPkg -> do
                     initialBuildSteps buildTargets cabal announce
                     return Nothing
-                _ -> fulfillCuratorBuildExpectations pname mcurator enableTests enableBenchmarks Nothing $
-                     Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses
+                _ -> fulfillCuratorBuildExpectations pname mcurator enableTests enableBenchmarks Nothing $ do
+                    let buildOptions = case (taskType, taskAllInOne, isFinalBuild) of
+                          (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
+                          (TTLocalMutable lp, False, False) -> primaryComponentOptions (makeLocalPackageTargets executableBuildStatuses lp) lp
+                          (TTLocalMutable lp, False, True) -> finalComponentOptions lp
+                          (TTLocalMutable lp, True, False) -> primaryComponentOptions (makeLocalPackageTargets executableBuildStatuses lp) lp ++ finalComponentOptions lp
+                          (TTRemotePackage{}, _, _) -> []
+                    Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses buildOptions
 
     initialBuildSteps buildTargets cabal announce = do
         _ <- announce ("initial-build-steps" <> RIO.display (annSuffix buildTargets))
@@ -1573,8 +1579,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         -> (KeepOutputOpen -> ExcludeTHLoading -> [String] -> RIO env ())
         -> (Utf8Builder -> RIO env ())
         -> Map Text ExecutableBuildStatus
+        -> [String]
         -> RIO env Installed
-    realBuild cache package pkgDir cabal0 announce executableBuildStatuses = do
+    realBuild cache package pkgDir cabal0 announce executableBuildStatuses buildOptions = do
         let cabal = cabal0 CloseOnException
         wc <- view $ actualCompilerVersionL.whichCompilerL
 
@@ -1620,13 +1627,7 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         let stripTHLoading
                 | configHideTHLoading config = ExcludeTHLoading
                 | otherwise                  = KeepTHLoading
-        cabal stripTHLoading (("build" :) $ (++ extraOpts) $
-            case (taskType, taskAllInOne, isFinalBuild) of
-                (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
-                (TTLocalMutable lp, False, False) -> primaryComponentOptions (makeLocalPackageTargets executableBuildStatuses lp) lp
-                (TTLocalMutable lp, False, True) -> finalComponentOptions lp
-                (TTLocalMutable lp, True, False) -> primaryComponentOptions (makeLocalPackageTargets executableBuildStatuses lp) lp ++ finalComponentOptions lp
-                (TTRemotePackage{}, _, _) -> [])
+        cabal stripTHLoading ("build" : (buildOptions <> extraOpts))
           `catch` \ex -> case ex of
               CabalExitedUnsuccessfully{} -> postBuildCheck False >> throwM ex
               _ -> throwM ex
