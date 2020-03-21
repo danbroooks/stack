@@ -1401,37 +1401,6 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
     enableTests = buildingFinals && any isCTest (taskComponents task)
     enableBenchmarks = buildingFinals && any isCBench (taskComponents task)
 
-    makeSingleBuildTargets pt = SingleBuildTargets
-      { singleBuildTargetLib = taskAllInOne && hasLib
-      , singleBuildTargetInternalLib = taskAllInOne && hasSubLib
-      , singleBuildTargetExe = taskAllInOne && hasExe
-      , singleBuildTargetTest = enableTests
-      , singleBuildTargetBench = enableBenchmarks
-      }
-      where
-        hasLib =
-          case packageTargetsLibraries pt of
-            NoLibraries    -> False
-            HasLibraries _ -> True
-
-        hasSubLib =
-          not $ Set.null (packageTargetsSubLibraries pt)
-
-        hasExe =
-          not $ Set.null (packageTargetsExecutables pt)
-
-    makePackageTargets executableBuildStatuses =
-      case taskType of
-        TTLocalMutable lp ->
-          makeLocalPackageTargets executableBuildStatuses lp
-        -- This isn't true, but we don't want to have this info for
-        -- upstream deps.
-        _ -> PackageTargets
-          { packageTargetsLibraries = NoLibraries
-          , packageTargetsSubLibraries = mempty
-          , packageTargetsExecutables = mempty
-          }
-
     annSuffix sbt =
       let result = showSingleBuildTargets sbt
        in if result == "" then "" else " (" <> result <> ")"
@@ -1539,7 +1508,26 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                  (logInfo
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
-            let buildTargets = makeSingleBuildTargets (makePackageTargets executableBuildStatuses)
+            let packageTargets =
+                  case taskType of
+                    TTLocalMutable lp ->
+                      makeLocalPackageTargets executableBuildStatuses lp
+                    -- This isn't true, but we don't want to have this info for
+                    -- upstream deps.
+                    _ -> PackageTargets
+                      { packageTargetsLibraries = NoLibraries
+                      , packageTargetsSubLibraries = mempty
+                      , packageTargetsExecutables = mempty
+                      }
+
+                buildTargets = SingleBuildTargets
+                  { singleBuildTargetLib = taskAllInOne && packageTargetsHasLib packageTargets
+                  , singleBuildTargetInternalLib = taskAllInOne && packageTargetsHasSubLib packageTargets
+                  , singleBuildTargetExe = taskAllInOne && packageTargetsHasExe packageTargets
+                  , singleBuildTargetTest = enableTests
+                  , singleBuildTargetBench = enableBenchmarks
+                  }
+
                 announceWithTargets label = announce (label <> RIO.display (annSuffix buildTargets))
 
             _neededConfig <- ensureConfig cache pkgDir ee (announceWithTargets "configure") cabal cabalfp task
@@ -1776,6 +1764,21 @@ data PackageTargets = PackageTargets
   , packageTargetsSubLibraries :: Set Text
   , packageTargetsExecutables  :: Set Text
   }
+
+packageTargetsHasLib :: PackageTargets -> Bool
+packageTargetsHasLib pt =
+  case packageTargetsLibraries pt of
+    NoLibraries    -> False
+    HasLibraries _ -> True
+
+packageTargetsHasSubLib :: PackageTargets -> Bool
+packageTargetsHasSubLib pt =
+  not $ Set.null (packageTargetsSubLibraries pt)
+
+packageTargetsHasExe :: PackageTargets -> Bool
+packageTargetsHasExe pt =
+  not $ Set.null (packageTargetsExecutables pt)
+
 
 makeLocalPackageTargets :: Map Text ExecutableBuildStatus -> LocalPackage -> PackageTargets
 makeLocalPackageTargets executableBuildStatuses lp = PackageTargets
