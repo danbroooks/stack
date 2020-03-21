@@ -1409,19 +1409,28 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
       , singleBuildTargetBench = enableBenchmarks
       }
       where
-        (hasLib, hasSubLib, hasExe) = case taskType of
+        hasLib =
+          case packageTargetsLibraries pt of
+            NoLibraries    -> False
+            HasLibraries _ -> True
+
+        hasSubLib =
+          not $ Set.null (packageTargetsSubLibraries pt)
+
+        hasExe =
+          not $ Set.null (packageTargetsExecutables pt)
+
+        pt =
+          case taskType of
             TTLocalMutable lp ->
-              let pt = makeLocalPackageTargets executableBuildStatuses lp
-                  hasLibrary =
-                    case packageTargetsLibraries pt of
-                      NoLibraries -> False
-                      HasLibraries _ -> True
-                  hasSubLibrary = not . Set.null $ packageTargetsSubLibraries pt
-                  hasExecutables = not . Set.null $ packageTargetsExecutables pt
-               in (hasLibrary, hasSubLibrary, hasExecutables)
+              makeLocalPackageTargets executableBuildStatuses lp
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
-            _ -> (False, False, False)
+            _ -> PackageTargets
+              { packageTargetsLibraries = NoLibraries
+              , packageTargetsSubLibraries = mempty
+              , packageTargetsExecutables = mempty
+              }
 
     annSuffix sbt =
       let result = showSingleBuildTargets sbt
@@ -1530,9 +1539,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                  (logInfo
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
-            let sbt = makeSingleBuildTargets executableBuildStatuses
+            let buildTargets = makeSingleBuildTargets executableBuildStatuses
 
-            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix sbt))) cabal cabalfp task
+            _neededConfig <- ensureConfig cache pkgDir ee (announce ("configure" <> RIO.display (annSuffix buildTargets))) cabal cabalfp task
             let installedMapHasThisPkg :: Bool
                 installedMapHasThisPkg =
                     case Map.lookup (packageName package) installedMap of
@@ -1548,14 +1557,13 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 -- https://github.com/commercialhaskell/stack/issues/2787
                 (True, _) | null acDownstream -> return Nothing
                 (_, True) | null acDownstream || installedMapHasThisPkg -> do
-                    initialBuildSteps executableBuildStatuses cabal announce
+                    initialBuildSteps buildTargets cabal announce
                     return Nothing
                 _ -> fulfillCuratorBuildExpectations pname mcurator enableTests enableBenchmarks Nothing $
                      Just <$> realBuild cache package pkgDir cabal0 announce executableBuildStatuses
 
-    initialBuildSteps executableBuildStatuses cabal announce = do
-        let sbt = makeSingleBuildTargets executableBuildStatuses
-        announce ("initial-build-steps" <> RIO.display (annSuffix sbt))
+    initialBuildSteps buildTargets cabal announce = do
+        _ <- announce ("initial-build-steps" <> RIO.display (annSuffix buildTargets))
         cabal KeepTHLoading ["repl", "stack-initial-build-steps"]
 
     realBuild
@@ -1782,11 +1790,11 @@ makeLocalPackageTargets executableBuildStatuses lp = PackageTargets
       lpPackage lp
 
 data SingleBuildTargets = SingleBuildTargets
-  { singleBuildTargetLib :: Bool
+  { singleBuildTargetLib         :: Bool
   , singleBuildTargetInternalLib :: Bool
-  , singleBuildTargetExe :: Bool
-  , singleBuildTargetTest :: Bool
-  , singleBuildTargetBench :: Bool
+  , singleBuildTargetExe         :: Bool
+  , singleBuildTargetTest        :: Bool
+  , singleBuildTargetBench       :: Bool
   }
 
 showSingleBuildTargets :: SingleBuildTargets -> Text
