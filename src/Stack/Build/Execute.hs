@@ -1508,25 +1508,25 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                  (logInfo
                       ("Building all executables for `" <> fromString (packageNameString (packageName package)) <>
                        "' once. After a successful build of all of them, only specified executables will be rebuilt."))
-            let packageTargets =
+            let buildTargets =
                   case taskType of
                     TTLocalMutable lp ->
-                      makeLocalPackageTargets executableBuildStatuses lp
-                    -- This isn't true, but we don't want to have this info for
-                    -- upstream deps.
-                    _ -> PackageTargets
-                      { packageTargetsLibraries = NoLibraries
-                      , packageTargetsSubLibraries = mempty
-                      , packageTargetsExecutables = mempty
-                      }
-
-                buildTargets = SingleBuildTargets
-                  { singleBuildTargetLib = taskAllInOne && packageTargetsHasLib packageTargets
-                  , singleBuildTargetInternalLib = taskAllInOne && packageTargetsHasSubLib packageTargets
-                  , singleBuildTargetExe = taskAllInOne && packageTargetsHasExe packageTargets
-                  , singleBuildTargetTest = enableTests
-                  , singleBuildTargetBench = enableBenchmarks
-                  }
+                      let pt = makeLocalPackageTargets executableBuildStatuses lp
+                       in SingleBuildTargets
+                            { singleBuildTargetLib = taskAllInOne && packageTargetsHasLib pt
+                            , singleBuildTargetInternalLib = taskAllInOne && packageTargetsHasSubLib pt
+                            , singleBuildTargetExe = taskAllInOne && packageTargetsHasExe pt
+                            , singleBuildTargetTest = enableTests
+                            , singleBuildTargetBench = enableBenchmarks
+                            }
+                    _ ->
+                      SingleBuildTargets
+                        { singleBuildTargetLib = False
+                        , singleBuildTargetInternalLib = False
+                        , singleBuildTargetExe = False
+                        , singleBuildTargetTest = enableTests
+                        , singleBuildTargetBench = enableBenchmarks
+                        }
 
                 announceWithTargets label = announce (label <> RIO.display (annSuffix buildTargets))
 
