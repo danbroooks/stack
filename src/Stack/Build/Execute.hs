@@ -1414,13 +1414,13 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
 
         (hasLib, hasSubLib, hasExe) = case taskType of
             TTLocalMutable lp ->
-              let package = lpPackage lp
+              let pt = makeLocalPackageTargets executableBuildStatuses lp
                   hasLibrary =
-                    case packageLibraries package of
+                    case packageTargetsLibraries pt of
                       NoLibraries -> False
                       HasLibraries _ -> True
-                  hasSubLibrary = not . Set.null $ packageInternalLibraries package
-                  hasExecutables = not . Set.null $ exesToBuild executableBuildStatuses lp
+                  hasSubLibrary = not . Set.null $ packageTargetsSubLibraries pt
+                  hasExecutables = not . Set.null $ packageTargetsExecutables pt
                in (hasLibrary, hasSubLibrary, hasExecutables)
             -- This isn't true, but we don't want to have this info for
             -- upstream deps.
@@ -1611,9 +1611,9 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
         cabal stripTHLoading (("build" :) $ (++ extraOpts) $
             case (taskType, taskAllInOne, isFinalBuild) of
                 (_, True, True) -> error "Invariant violated: cannot have an all-in-one build that also has a final build step."
-                (TTLocalMutable lp, False, False) -> primaryComponentOptions executableBuildStatuses lp
+                (TTLocalMutable lp, False, False) -> primaryComponentOptions (makeLocalPackageTargets executableBuildStatuses lp) lp
                 (TTLocalMutable lp, False, True) -> finalComponentOptions lp
-                (TTLocalMutable lp, True, False) -> primaryComponentOptions executableBuildStatuses lp ++ finalComponentOptions lp
+                (TTLocalMutable lp, True, False) -> primaryComponentOptions (makeLocalPackageTargets executableBuildStatuses lp) lp ++ finalComponentOptions lp
                 (TTRemotePackage{}, _, _) -> [])
           `catch` \ex -> case ex of
               CabalExitedUnsuccessfully{} -> postBuildCheck False >> throwM ex
@@ -1760,6 +1760,22 @@ singleBuild ac@ActionContext {..} ee@ExecuteEnv {..} task@Task {..} installedMap
                 liftIO $ atomically $ modifyTVar' tvar (Map.insert (dpGhcPkgId dp) dp)
                 return $ Just (dpGhcPkgId dp)
             _ -> error $ "singleBuild: invariant violated: multiple results when describing installed package " ++ show (name, dps)
+
+data PackageTargets = PackageTargets
+  { packageTargetsLibraries      :: PackageLibraries
+  , packageTargetsSubLibraries :: Set Text
+  , packageTargetsExecutables  :: Set Text
+  }
+
+makeLocalPackageTargets :: Map Text ExecutableBuildStatus -> LocalPackage -> PackageTargets
+makeLocalPackageTargets executableBuildStatuses lp = PackageTargets
+  { packageTargetsLibraries = packageLibraries package
+  , packageTargetsSubLibraries = packageInternalLibraries package
+  , packageTargetsExecutables = exesToBuild executableBuildStatuses lp
+  }
+  where
+    package =
+      lpPackage lp
 
 data SingleBuildTargets = SingleBuildTargets
   { singleBuildTargetLib :: Bool
@@ -2231,21 +2247,22 @@ extraBuildOptions wc bopts = do
         return [optsFlag, baseOpts]
 
 -- Library, internal and foreign libraries and executable build components.
-primaryComponentOptions :: Map Text ExecutableBuildStatus -> LocalPackage -> [String]
-primaryComponentOptions executableBuildStatuses lp =
+primaryComponentOptions :: PackageTargets -> LocalPackage -> [String]
+primaryComponentOptions pt lp =
       -- TODO: get this information from target parsing instead,
       -- which will allow users to turn off library building if
       -- desired
-      (case packageLibraries package of
+      (case packageTargetsLibraries pt of
          NoLibraries -> []
          HasLibraries names ->
-             map T.unpack
-           $ T.append "lib:" (T.pack (packageNameString (packageName package)))
+           map T.unpack
+           $ T.append "lib:" packageNameText
            : map (T.append "flib:") (Set.toList names)) ++
-      map (T.unpack . T.append "lib:") (Set.toList $ packageInternalLibraries package) ++
-      map (T.unpack . T.append "exe:") (Set.toList $ exesToBuild executableBuildStatuses lp)
+      map (T.unpack . T.append "lib:") (Set.toList $ packageTargetsSubLibraries pt) ++
+      map (T.unpack . T.append "exe:") (Set.toList $ packageTargetsExecutables pt)
   where
-    package = lpPackage lp
+    packageNameText =
+      T.pack (packageNameString (packageName (lpPackage lp)))
 
 -- | History of this function:
 --
